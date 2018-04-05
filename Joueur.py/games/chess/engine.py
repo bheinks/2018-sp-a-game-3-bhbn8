@@ -1,5 +1,4 @@
 import copy
-from random import choice
 
 # local imports
 from games.chess.constants import *
@@ -7,32 +6,14 @@ from games.chess.constants import *
 
 
 class Chess:
+    # map piece types for framework
     PIECE_MAP = {
-        'p': "Pawn",
-        'n': "Knight",
-        'b': "Bishop",
-        'r': "Rook",
-        'q': "Queen",
-        'k': "King"
-    }
-
-    PIECE_VALUES = {
-        'b': {
-            'p': -1,
-            'n': -3,
-            'b': -3,
-            'r': -5,
-            'q': -9,
-            'k': -999,
-        },
-        'w': {
-            'p': 1,
-            'n': 3,
-            'b': 3,
-            'r': 5,
-            'q': 9,
-            'k': 999,
-        }
+        PAWN: "Pawn",
+        KNIGHT: "Knight",
+        BISHOP: "Bishop",
+        ROOK: "Rook",
+        QUEEN: "Queen",
+        KING: "King"
     }
 
     def __init__(self, fen=DEFAULT_FEN):
@@ -40,14 +21,22 @@ class Chess:
         self.kings = {WHITE: EMPTY, BLACK: EMPTY}
         self.castling = {WHITE: 0, BLACK: 0}
         self.history = []
-        self.value = 0
+        #self.value = 0
 
         self.load(fen)
 
+    def get_value(self):
+        value = 0
+
+        for square in SQUARES:
+            value += self.get_piece_value(square.value)
+
+        return value
+
     def copy(self):
         new = copy.copy(self)
-        new.kings = copy.deepcopy(self.kings)
-        new.castling = copy.deepcopy(self.castling)
+        new.kings = {WHITE: self.kings[WHITE], BLACK: self.kings[BLACK]}
+        new.castling = {WHITE: self.castling[WHITE], BLACK: self.castling[BLACK]}
 
         return new
 
@@ -64,19 +53,19 @@ class Chess:
                 color = WHITE if piece.isupper() else BLACK
                 piece = Piece(piece.lower(), color)
                 self.place_piece(piece, Chess.get_san(square))
-                self.value += Chess.PIECE_VALUES[color][piece.type]
+                #self.value += Chess.get_piece_value(color, piece.type, square)
                 square += 1
 
         self.turn = tokens[1]
 
         if 'K' in tokens[2]:
-            self.castling[WHITE] |= Bits.KSIDE_CASTLE.value
+            self.castling[WHITE] |= KSIDE_CASTLE
         if 'Q' in tokens[2]:
-            self.castling[WHITE] |= Bits.QSIDE_CASTLE.value
+            self.castling[WHITE] |= QSIDE_CASTLE
         if 'k' in tokens[2]:
-            self.castling[BLACK] |= Bits.KSIDE_CASTLE.value
+            self.castling[BLACK] |= KSIDE_CASTLE
         if 'q' in tokens[2]:
-            self.castling[BLACK] |= Bits.QSIDE_CASTLE.value
+            self.castling[BLACK] |= QSIDE_CASTLE
 
         self.ep_square = EMPTY if tokens[3] == '-' else SQUARES[tokens[3]].value
         self.half_moves = int(tokens[4])
@@ -114,13 +103,13 @@ class Chess:
 
         # add castling permissions
         cflags = ''
-        if self.castling[WHITE] & Bits.KSIDE_CASTLE.value:
+        if self.castling[WHITE] & KSIDE_CASTLE:
             cflags += 'K'
-        if self.castling[WHITE] & Bits.QSIDE_CASTLE.value:
+        if self.castling[WHITE] & QSIDE_CASTLE:
             cflags += 'Q'
-        if self.castling[BLACK] & Bits.KSIDE_CASTLE.value:
+        if self.castling[BLACK] & KSIDE_CASTLE:
             cflags += 'k'
-        if self.castling[BLACK] & Bits.QSIDE_CASTLE.value:
+        if self.castling[BLACK] & QSIDE_CASTLE:
             cflags += 'q'
 
         # if castling flag is empty, replace with dash
@@ -140,15 +129,6 @@ class Chess:
 
         if piece.type == KING:
             self.kings[piece.color] = sq
-
-    def remove_piece(self, square):
-        piece = self.get_piece(square)
-        self.board[SQUARES[square].value] = None
-
-        if piece and piece == KING:
-            self.kings[piece.color] = EMPTY
-
-        return piece
 
     def print(self):
         print("   +" + '-'*24 + '+')
@@ -218,13 +198,13 @@ class Chess:
 
                 # if square is empty
                 if not self.board[square]:
-                    moves += add_move(i, square, Bits.NORMAL.value)
+                    moves += add_move(i, square, NORMAL)
 
                     # double square
                     square = i + PAWN_OFFSETS[us][1]
 
                     if second_rank[us] == Chess.get_rank(i) and not self.board[square]:
-                        moves += add_move(i, square, Bits.BIG_PAWN.value)
+                        moves += add_move(i, square, BIG_PAWN)
 
                 # pawn captures
                 for j in range(2, 4):
@@ -236,10 +216,10 @@ class Chess:
 
                     # if square is occupied by enemy piece
                     if self.board[square] and self.board[square].color == them:
-                        moves += add_move(i, square, Bits.CAPTURE.value)
+                        moves += add_move(i, square, CAPTURE)
                     # if capture square is en passant square
                     elif square == self.ep_square:
-                        moves += add_move(i, square, Bits.EP_CAPTURE.value)
+                        moves += add_move(i, square, EP_CAPTURE)
             else:
                 for offset in PIECE_OFFSETS[piece.type]:
                     square = i
@@ -252,10 +232,10 @@ class Chess:
                             break
 
                         if not self.board[square]:
-                            moves += add_move(i, square, Bits.NORMAL.value)
+                            moves += add_move(i, square, NORMAL)
                         else:
                             if self.board[square].color == them:
-                                moves += add_move(i, square, Bits.CAPTURE.value)
+                                moves += add_move(i, square, CAPTURE)
 
                             break
 
@@ -265,7 +245,7 @@ class Chess:
 
         if not single_square or last_sq == self.kings[us]:
             # kingside castling
-            if self.castling[us] & Bits.KSIDE_CASTLE.value:
+            if self.castling[us] & KSIDE_CASTLE:
                 castling_from = self.kings[us]
                 castling_to = castling_from + 2
 
@@ -275,10 +255,10 @@ class Chess:
                         not self.attacked(them, self.kings[us]) and
                         not self.attacked(them, castling_from+1) and
                         not self.attacked(them, castling_to)):
-                    moves += add_move(self.kings[us], castling_to, Bits.KSIDE_CASTLE.value)
+                    moves += add_move(self.kings[us], castling_to, KSIDE_CASTLE)
 
             # queenside castling
-            if self.castling[us] & Bits.QSIDE_CASTLE.value:
+            if self.castling[us] & QSIDE_CASTLE:
                 castling_from = self.kings[us]
                 castling_to = castling_from - 2
 
@@ -289,7 +269,7 @@ class Chess:
                         not self.attacked(them, self.kings[us]) and
                         not self.attacked(them, castling_from-1) and
                         not self.attacked(them, castling_to)):
-                    moves += add_move(self.kings[us], castling_to, Bits.QSIDE_CASTLE.value)
+                    moves += add_move(self.kings[us], castling_to, QSIDE_CASTLE)
 
         # if we're allowing illegal moves
         if not legal:
@@ -424,12 +404,13 @@ class Chess:
         return True
 
     def in_draw(self):
-        return (self.in_stalemate() or
-                self.insufficient_material() or
-                self.in_threefold_repetition())
+        return (self.half_moves >= 100 or
+                self.in_threefold_repetition() or
+                self.insufficient_material())# or
+                #self.in_stalemate())
 
     def game_over(self):
-        return self.half_moves() >= 100 or self.in_checkmate() or self.in_draw()
+        return self.half_moves >= 50 or self.in_checkmate() or self.in_draw()
 
     def move(self, move):
         us = self.turn
@@ -437,22 +418,23 @@ class Chess:
         self.snapshot(move)
 
         # if capture, subtract value of piece
-        self.value -= Chess.PIECE_VALUES[them].get(move.captured, 0)
+        #self.value -= Chess.PIECE_VALUES[them].get(move.captured, 0)
+        #self.value -= Chess.get_piece_value(them, move.captured, move.m_to)
 
         self.board[move.m_to] = self.board[move.m_from]
         self.board[move.m_from] = None
 
         # if en passant capture, remove the captured pawn
-        if move.flags & Bits.EP_CAPTURE.value:
+        if move.flags & EP_CAPTURE:
             if self.turn == BLACK:
                 self.board[move.m_to-16] = None
             else:
                 self.board[move.m_to+16] = None
 
         # if pawn promotion, replace with new piece
-        if move.promotion:
-            self.value -= Chess.PIECE_VALUES[self.turn]['p']
-            self.value += Chess.PIECE_VALUES[self.turn][move.promotion]
+        if move.flags & PROMOTION:
+            #self.value -= Chess.PIECE_VALUES[self.turn]['p']
+            #self.value += Chess.PIECE_VALUES[self.turn][move.promotion]
 
             self.board[move.m_to] = Piece(move.promotion, us)
 
@@ -461,13 +443,13 @@ class Chess:
             self.kings[self.board[move.m_to].color] = move.m_to
 
             # if we castled, move the rook next to the king
-            if move.flags & Bits.KSIDE_CASTLE.value:
+            if move.flags & KSIDE_CASTLE:
                 castling_to = move.m_to - 1
                 castling_from = move.m_to + 1
 
                 self.board[castling_to] = self.board[castling_from]
                 self.board[castling_from] = None
-            elif move.flags & Bits.QSIDE_CASTLE.value:
+            elif move.flags & QSIDE_CASTLE:
                 castling_to = move.m_to + 1
                 castling_from = move.m_to - 2
 
@@ -492,7 +474,7 @@ class Chess:
                     break
 
         # if big pawn move, update the en passant square
-        if move.flags & Bits.BIG_PAWN.value:
+        if move.flags & BIG_PAWN:
             if self.turn == BLACK:
                 self.ep_square = move.m_to - 16
             else:
@@ -501,7 +483,7 @@ class Chess:
             self.ep_square = EMPTY
 
         # reset the 50 move counter if a pawn is moved or a piece is captured
-        if move.piece == PAWN or move.flags & (Bits.CAPTURE.value | Bits.EP_CAPTURE.value):
+        if move.piece == PAWN or move.flags & (CAPTURE | EP_CAPTURE):
             self.half_moves = 0
         else:
             self.half_moves += 1
@@ -524,7 +506,7 @@ class Chess:
         self.ep_square = old.ep_square
         self.half_moves = old.half_moves
         self.move_number = old.move_number
-        self.value = old.value
+        #self.value = old.value
 
         us = self.turn
         them = Chess.swap_color(us)
@@ -533,9 +515,9 @@ class Chess:
         self.board[move.m_from].type = move.piece # undo any promotions
         self.board[move.m_to] = None
 
-        if move.flags & Bits.CAPTURE.value:
+        if move.flags & CAPTURE:
             self.board[move.m_to] = Piece(move.captured, them)
-        elif move.flags & Bits.EP_CAPTURE.value:
+        elif move.flags & EP_CAPTURE:
             index = 0
 
             if us == BLACK:
@@ -545,13 +527,13 @@ class Chess:
 
             self.board[index] = Piece(PAWN, them)
 
-        if move.flags & (Bits.KSIDE_CASTLE.value | Bits.QSIDE_CASTLE.value):
+        if move.flags & (KSIDE_CASTLE | QSIDE_CASTLE):
             castling_to = castling_from = 0
 
-            if move.flags & Bits.KSIDE_CASTLE.value:
+            if move.flags & KSIDE_CASTLE:
                 castling_to = move.m_to + 1
                 castling_from = move.m_to -1
-            elif move.flags & Bits.QSIDE_CASTLE.value:
+            elif move.flags & QSIDE_CASTLE:
                 castling_to = move.m_to - 2
                 castling_from = move.m_to + 1
 
@@ -592,6 +574,20 @@ class Chess:
 
         return matching_move
 
+    def get_piece_value(self, square):
+        piece = self.board[square]
+
+        if not piece:
+            return 0
+
+        color = piece.color
+        type = piece.type
+
+        # add material and PST heuristic value
+        value = PIECE_VALUES[type] + PST_VALUES[color][type][square]
+
+        return value if color == WHITE else -value
+
 
 class Piece:
     def __init__(self, type, color):
@@ -610,11 +606,11 @@ class Move:
         self.captured = ''
         
         if promotion:
-            self.flags |= Bits.PROMOTION.value
+            self.flags |= PROMOTION
 
         if board[m_to]:
             self.captured = board[m_to].type
-        elif flags & Bits.EP_CAPTURE.value:
+        elif flags & EP_CAPTURE:
             self.captured = PAWN
 
     def __eq__(self, other):

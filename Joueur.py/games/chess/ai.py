@@ -1,11 +1,11 @@
 # This is where you build your AI for the Chess game.
 
-import random
-from time import sleep
+from timeit import default_timer
 
 # local imports
 from joueur.base_ai import BaseAI
 from games.chess.engine import Chess
+from games.chess.profilehooks import profile
 
 # <<-- Creer-Merge: imports -->> - Code you add between this comment and the end comment will be preserved between Creer re-runs.
 # you can add additional import(s) here
@@ -35,8 +35,8 @@ class AI(BaseAI):
         # represents whether or not we want minimax to return high or low
         self.color_code = 1 if self.player.color == "White" else -1
 
-        # depth limit
-        self.depth_limit = int(self.get_setting("depth_limit"))
+        # depth limit (default to 4 if no depth provided)
+        self.depth_limit = int(self.get_setting("depth_limit") or 4)
 
         # <<-- /Creer-Merge: start -->>
 
@@ -72,6 +72,7 @@ class AI(BaseAI):
         self.chess.move(move)
         
         print("Best move: {}".format(move))
+        print("Time remaining: {}".format(self.player.time_remaining))
         self.chess.print()
         print()
         
@@ -93,15 +94,24 @@ class AI(BaseAI):
         fr_to = move.to_file + str(move.to_rank)
         self.chess.move(self.chess.get_enemy_move(fr_from, fr_to))
 
+    #@profile(immediate=True)
     def minimax_root(self, depth, game, is_max_player):
+        start_time = default_timer()
+
         moves = game.generate_moves()
-        random.shuffle(moves)
+        #random.shuffle(moves)
         best_value = -9999
         best_move = None
 
         for move in moves:
+            duration = (default_timer() - start_time) * 1000000000
+
+            # if turn is taking longer than 5% of reminaing time, return now
+            if ((duration/self.player.time_remaining) * 100) > 5:
+                break
+
             game.move(move)
-            value = self.minimax(depth-1, game, not is_max_player)
+            value = self.minimax(depth-1, game, -10000, 10000, not is_max_player)
             game.undo()
 
             if value >= best_value:
@@ -110,23 +120,27 @@ class AI(BaseAI):
 
         return best_move
 
-    def minimax(self, depth, game, is_max_player):
-        if not depth:
-            return game.value * self.color_code
-
+    def minimax(self, depth, game, alpha, beta, is_max_player):
         if game.in_draw():
-            return 0
+            return -999
+
+        if not depth:
+            return game.get_value() * self.color_code
 
         moves = game.generate_moves()
-        random.shuffle(moves)
+        #random.shuffle(moves)
 
         if is_max_player:
             best_value = -9999
 
             for move in moves:
                 game.move(move)
-                best_value = max(best_value, self.minimax(depth-1, game, not is_max_player))
+                best_value = max(best_value, self.minimax(depth-1, game, alpha, beta, False))
                 game.undo()
+
+                alpha = max(alpha, best_value)
+                if beta <= alpha:
+                    return best_value
 
             return best_value
         else:
@@ -134,8 +148,12 @@ class AI(BaseAI):
 
             for move in moves:
                 game.move(move)
-                best_value = min(best_value, self.minimax(depth-1, game, not is_max_player))
+                best_value = min(best_value, self.minimax(depth-1, game, alpha, beta, True))
                 game.undo()
+
+                beta = min(beta, best_value)
+                if beta <= alpha:
+                    return best_value
 
             return best_value
 
