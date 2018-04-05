@@ -5,7 +5,6 @@ from timeit import default_timer
 # local imports
 from joueur.base_ai import BaseAI
 from games.chess.engine import Chess
-from games.chess.profilehooks import profile
 
 # <<-- Creer-Merge: imports -->> - Code you add between this comment and the end comment will be preserved between Creer re-runs.
 # you can add additional import(s) here
@@ -72,7 +71,6 @@ class AI(BaseAI):
         self.chess.move(move)
         
         print("Best move: {}".format(move))
-        print("Time remaining: {}".format(self.player.time_remaining))
         self.chess.print()
         print()
         
