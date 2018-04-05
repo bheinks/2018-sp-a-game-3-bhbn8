@@ -34,8 +34,8 @@ class AI(BaseAI):
         # represents whether or not we want minimax to return high or low
         self.color_code = 1 if self.player.color == "White" else -1
 
-        # depth limit (default to 4 if no depth provided)
-        self.depth_limit = int(self.get_setting("depth_limit") or 4)
+        # depth limit (default to 3 if no depth provided)
+        self.depth_limit = int(self.get_setting("depth_limit") or 3)
 
         # <<-- /Creer-Merge: start -->>
 
